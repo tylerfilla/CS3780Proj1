@@ -4,5 +4,5 @@
 # Project 1
 #
 
-manager: manager.cpp
-	g++ -o manager manager.cpp
+login: login.cpp
+	c++ -std=c++11 -o login login.cpp
