@@ -5,4 +5,4 @@
 #
 
 login: login.cpp
-	c++ -std=c++11 -o login login.cpp
+	c++ -std=c++11 -lcrypto -I${HOME}/.local/include -L${HOME}/.local/lib -o login login.cpp

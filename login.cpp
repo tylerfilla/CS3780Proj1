@@ -7,10 +7,13 @@
 
 #include <cstdlib>
 #include <cctype>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include <openssl/md5.h>
 
 enum class menu_choice
 {
@@ -61,23 +64,29 @@ static menu_choice present_menu()
 
 static std::pair<std::string, std::string> prompt_credentials()
 {
-    // Get username
-    std::cout << "Username: ";
     std::string username;
+    std::string conceal_pass_str;
+    bool conceal_pass;
+    std::string password;
+    std::string::const_iterator pci;
+
+    // Get username
+ask_username:
+    std::cout << "Username: ";
     std::getline(std::cin, username);
+
+    if (username.empty())
+        goto ask_username;
 
     // Ask whether to show password on terminal input
     // This requires a supported system and environment, but works on delmar
     std::cout << "Show password? (y/N) ";
-    std::string conceal_pass_str;
     std::getline(std::cin, conceal_pass_str);
 
-    bool conceal_pass = conceal_pass_str.compare("y")
-            && conceal_pass_str.compare("Y");
+    // Determine if user wants to conceal the password
+    conceal_pass = conceal_pass_str.compare("y") && conceal_pass_str.compare("Y");
 
-    std::string password;
-    std::string::const_iterator pci;
-
+    // Get password (with optional concealing)
 ask_password:
     if (conceal_pass)
     {
@@ -89,6 +98,10 @@ ask_password:
     std::cout << "Password: ";
     std::getline(std::cin, password);
 
+    if (password.empty())
+        goto ask_password;
+
+    // Ensure password is a decimal integer
     for (pci = password.cbegin(); pci != password.cend(); ++pci)
     {
         if (!std::isdigit(*pci))
@@ -127,7 +140,34 @@ static int do_register()
     auto username = credentials.first;
     auto password = credentials.second;
 
-    
+    //
+    // Hashing
+    //
+
+    // Hash password with MD5
+    unsigned char password_md5[MD5_DIGEST_LENGTH];
+    MD5((const unsigned char*) &password[0], password.length(), &password_md5[0]);
+
+    //
+    // Output
+    //
+
+    // Append to MD5 hash file
+    std::ofstream passwd_file_md5;
+    passwd_file_md5.open("passwdmd5", std::ofstream::out | std::ofstream::app);
+    passwd_file_md5 << username << ":" << std::hex;
+    for (auto i = std::begin(password_md5); i != std::end(password_md5); ++i)
+    {
+        passwd_file_md5 << static_cast<int>(*i);
+    }
+    passwd_file_md5 << "\n";
+    passwd_file_md5.close();
+
+    // Append to SHA256 hash file
+    // FIXME: Write this
+
+    // Append to salted SHA256 hash file
+    // FIXME: Write this
 
     return 0;
 }
