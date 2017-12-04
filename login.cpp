@@ -10,10 +10,13 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <utility>
 
 #include <openssl/md5.h>
+#include <openssl/rand.h>
+#include <openssl/sha.h>
 
 enum class menu_choice
 {
@@ -146,7 +149,24 @@ static int do_register()
 
     // Hash password with MD5
     unsigned char password_md5[MD5_DIGEST_LENGTH];
-    MD5((const unsigned char*) &password[0], password.length(), &password_md5[0]);
+    MD5(reinterpret_cast<const unsigned char*>(&password[0]), password.length(), &password_md5[0]);
+
+    // Hash password with SHA256
+    unsigned char password_sha256[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(&password[0]), password.length(), &password_sha256[0]);
+
+    // Salt and hash password with SHA256
+    unsigned char salt[4];
+    RAND_bytes(salt, sizeof(salt));
+    std::stringstream salted_password_ss;
+    salted_password_ss << password << std::hex;
+    for (auto i = std::begin(salt); i != std::end(salt); ++i)
+    {
+        salted_password_ss << static_cast<int>(*i);
+    }
+    auto salted_password = salted_password_ss.str();
+    unsigned char password_salted_sha256[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(&salted_password[0]), salted_password.length(), &password_salted_sha256[0]);
 
     //
     // Output
@@ -164,10 +184,31 @@ static int do_register()
     passwd_file_md5.close();
 
     // Append to SHA256 hash file
-    // FIXME: Write this
+    std::ofstream passwd_file_sha256;
+    passwd_file_sha256.open("passwdsha256", std::ofstream::out | std::ofstream::app);
+    passwd_file_sha256 << username << ":" << std::hex;
+    for (auto i = std::begin(password_sha256); i != std::end(password_sha256); ++i)
+    {
+        passwd_file_sha256 << static_cast<int>(*i);
+    }
+    passwd_file_sha256 << "\n";
+    passwd_file_sha256.close();
 
     // Append to salted SHA256 hash file
-    // FIXME: Write this
+    std::ofstream passwd_file_salted_sha256;
+    passwd_file_salted_sha256.open("passwdsha256salt", std::ofstream::out | std::ofstream::app);
+    passwd_file_salted_sha256 << username << ":" << std::hex;
+    for (auto i = std::begin(salt); i != std::end(salt); ++i)
+    {
+        passwd_file_salted_sha256 << static_cast<int>(*i);
+    }
+    passwd_file_salted_sha256 << ":";
+    for (auto i = std::begin(password_salted_sha256); i != std::end(password_salted_sha256); ++i)
+    {
+        passwd_file_salted_sha256 << static_cast<int>(*i);
+    }
+    passwd_file_salted_sha256 << "\n";
+    passwd_file_salted_sha256.close();
 
     return 0;
 }
