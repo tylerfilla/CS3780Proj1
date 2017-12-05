@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -295,15 +296,30 @@ static int crack_passwdSHA256salt(std::ifstream& file, const std::string& start,
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    if (argc < 2)
     {
-        std::cout << "Usage: crack <file>\n";
+        std::cout << "Usage: crack <file> [start] [num]\n";
         std::cout << "Attempt to crack passwords from the given password file\n";
+        std::cout << "Generate num password attempts starting with start\n";
         return 0;
     }
 
     // Get file argument
     auto file_path = argv[1];
+
+    // Get start argument
+    auto start = "0";
+    if (argc >= 3)
+    {
+         start = argv[2];
+    }
+
+    // Get num argument
+    auto num = 100000;
+    if (argc >= 4)
+    {
+         num = std::strtoul(argv[3], nullptr, 0);
+    }
 
     // Get file name
     auto file_name = basename(file_path);
@@ -315,15 +331,15 @@ int main(int argc, char* argv[])
     // Run the file-appropriate cracking function
     if (std::strcmp(file_name, "passwdmd5") == 0)
     {
-        return crack_passwdmd5(file, "0", 100000);
+        return crack_passwdmd5(file, start, num);
     }
     else if (std::strcmp(file_name, "passwdSHA256") == 0)
     {
-        return crack_passwdSHA256(file, "0", 100000);
+        return crack_passwdSHA256(file, start, num);
     }
     else if (std::strcmp(file_name, "passwdSHA256salt") == 0)
     {
-        return crack_passwdSHA256salt(file, "0", 100000);
+        return crack_passwdSHA256salt(file, start, num);
     }
     else
     {
