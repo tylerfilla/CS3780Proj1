@@ -216,7 +216,7 @@ static int do_log_in()
 
     // Check against SHA256 password file
     std::ifstream passwd_file_sha256;
-    passwd_file_sha256.open("passwdsha256");
+    passwd_file_sha256.open("passwdSHA256");
     std::cout << "\n";
     for (std::string line; std::getline(passwd_file_sha256, line);)
     {
@@ -224,7 +224,7 @@ static int do_log_in()
         if (line.find(username) == 0)
         {
             // DEBUG PRINT
-            std::cout << "Matched username in passwdsha256!\n";
+            std::cout << "Matched username in passwdSHA256!\n";
 
             // If password hash matches
             std::cout << "Expected hash: " << password_sha256 << "\n";
@@ -244,7 +244,7 @@ static int do_log_in()
 
     // Check against salted SHA256 password file
     std::ifstream passwd_file_salted_sha256;
-    passwd_file_salted_sha256.open("passwdsha256salt");
+    passwd_file_salted_sha256.open("passwdSHA256salt");
     std::cout << "\n";
     for (std::string line; std::getline(passwd_file_salted_sha256, line);)
     {
@@ -252,7 +252,7 @@ static int do_log_in()
         if (line.find(username) == 0)
         {
             // DEBUG PRINT
-            std::cout << "Matched username in passwdsha256salt!\n";
+            std::cout << "Matched username in passwdSHA256salt!\n";
 
             // Inefficiently and dangerously extract the saved salt
             auto salt = line.substr(line.find(":") + 1);
@@ -294,14 +294,14 @@ static int do_register()
 
     // Do SHA256 hash
     std::ofstream passwd_file_sha256;
-    passwd_file_sha256.open("passwdsha256", std::ofstream::out | std::ofstream::app);
+    passwd_file_sha256.open("passwdSHA256", std::ofstream::out | std::ofstream::app);
     passwd_file_sha256 << username << ":" << hash_password_sha256(password) << "\n";
     passwd_file_sha256.close();
 
     // Do salted SHA256 hash
     auto salt_hash = hash_password_salted_sha256(password);
     std::ofstream passwd_file_salted_sha256;
-    passwd_file_salted_sha256.open("passwdsha256salt", std::ofstream::out | std::ofstream::app);
+    passwd_file_salted_sha256.open("passwdSHA256salt", std::ofstream::out | std::ofstream::app);
     passwd_file_salted_sha256 << username << ":" << salt_hash.first << ":" << salt_hash.second << "\n";
     passwd_file_salted_sha256.close();
 
