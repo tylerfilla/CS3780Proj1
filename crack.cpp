@@ -9,8 +9,10 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -63,7 +65,7 @@ void split_passwd_line(const std::string& str, std::vector<std::string>& out)
     }
 }
 
-static int crack_passwdmd5(std::ifstream& file)
+static int crack_passwdmd5(std::ifstream& file, const std::string& start, unsigned int num)
 {
     std::cout << "Attempting to crack MD5 password file\n";
     std::cout << "Loading accounts into memory...";
@@ -101,8 +103,8 @@ static int crack_passwdmd5(std::ifstream& file)
     std::cout << accounts.size() << " unique passwords among " << num_accounts << " accounts\n";
 
     // Crack the passwords!
-    std::string password = "0";
-    for (int a = 0; a < 100000; ++a)
+    std::string password = start;
+    for (int a = 0; a < num; ++a)
     {
         auto password_md5 = hash_password_md5(password);
         if (accounts.find(password_md5) != accounts.end())
@@ -143,20 +145,150 @@ static int crack_passwdmd5(std::ifstream& file)
     return 0;
 }
 
-static int crack_passwdSHA256(std::ifstream& file)
+static int crack_passwdSHA256(std::ifstream& file, const std::string& start, unsigned int num)
 {
     std::cout << "Attempting to crack SHA256 password file\n";
+    std::cout << "Loading accounts into memory...";
+    std::cout.flush();
 
-    //
+    // A map of accounts from password hashes to sets of usernames
+    std::unordered_map<std::string, std::unordered_set<std::string>> accounts;
+
+    // Load all accounts from file into memory
+    unsigned int num_accounts = 0;
+    for (std::string line; std::getline(file, line);)
+    {
+        std::vector<std::string> line_parts;
+        split_passwd_line(line, line_parts);
+
+        if (line_parts.size() != 2)
+            continue;
+
+        auto username = line_parts[0];
+        auto password_sha256 = line_parts[1];
+
+        if (accounts.find(password_sha256) == accounts.end())
+        {
+            accounts[password_sha256] = { username };
+        }
+        else
+        {
+            accounts[password_sha256].insert(username);
+        }
+
+        num_accounts++;
+    }
+
+    std::cout << "done!\n";
+    std::cout << accounts.size() << " unique passwords among " << num_accounts << " accounts\n";
+
+    // Crack the passwords!
+    std::string password = start;
+    for (int a = 0; a < num; ++a)
+    {
+        auto password_sha256 = hash_password_sha256(password);
+        if (accounts.find(password_sha256) != accounts.end())
+        {
+            std::cout << "MATCHED: \"" << password << "\" (SHA256: " + password_sha256 + ")\n";
+
+            auto usernames = accounts[password_sha256];
+            for (auto u = usernames.cbegin(); u != usernames.cend(); ++u)
+            {
+                std::cout << " -> " << *u << "\n";
+            }
+        }
+
+        // Increment one decimal place with carry logic and zeroes
+        // Reserve an extra character to prevent reallocation during iteration
+        password.reserve(password.length() + 1);
+        for (auto i = password.rbegin(); i != password.rend(); ++i)
+        {
+            if (*i == '9')
+            {
+                *i = '0';
+
+                // Prepend a zero to satisfy carry, if necessary
+                if (i == password.rend() - 1)
+                {
+                    password = '0' + password;
+                }
+            }
+            else
+            {
+                // Increment numeral and stop
+                ++*i;
+                break;
+            }
+        }
+    }
 
     return 0;
 }
 
-static int crack_passwdSHA256salt(std::ifstream& file)
+static int crack_passwdSHA256salt(std::ifstream& file, const std::string& start, unsigned int num)
 {
     std::cout << "Attempting to crack salted SHA256 password file\n";
+    std::cout << "Loading accounts into memory...";
+    std::cout.flush();
 
-    //
+    // A map of accounts from pairs of usernames and salts to password hashes
+    std::list<std::tuple<std::string, std::string, std::string>> accounts;
+
+    // Load all accounts from file into memory
+    for (std::string line; std::getline(file, line);)
+    {
+        std::vector<std::string> line_parts;
+        split_passwd_line(line, line_parts);
+
+        if (line_parts.size() != 3)
+            continue;
+
+        auto username = line_parts[0];
+        auto salt = line_parts[1];
+        auto password_sha256 = line_parts[2];
+
+        accounts.push_back(std::make_tuple(username, salt, password_sha256));
+    }
+
+    std::cout << "done!\n";
+    std::cout << accounts.size() << " accounts\n";
+
+    for (auto b = accounts.cbegin(); b != accounts.cend(); ++b)
+    {
+        std::string password = start;
+        for (int a = 0; a < num; ++a)
+        {
+            auto password_sha256 = hash_password_sha256(std::get<1>(*b) + password);
+            if (password_sha256 == std::get<2>(*b))
+            {
+                std::cout << "MATCHED: \"" << password << "\" (SHA256: " + password_sha256 + ")\n";
+                std::cout << " -> " << std::get<0>(*b) << "\n";
+            }
+
+            // Increment one decimal place with carry logic and zeroes
+            // Reserve an extra character to prevent reallocation during iteration
+            password.reserve(password.length() + 1);
+            for (auto i = password.rbegin(); i != password.rend(); ++i)
+            {
+                if (*i == '9')
+                {
+                    *i = '0';
+
+                    // Prepend a zero to satisfy carry, if necessary
+                    if (i == password.rend() - 1)
+                    {
+                        password = '0' + password;
+                    }
+                }
+                else
+                {
+                    // Increment numeral and stop
+                    ++*i;
+                    break;
+                }
+            }
+        }
+    }
 
     return 0;
 }
@@ -183,15 +315,15 @@ int main(int argc, char* argv[])
     // Run the file-appropriate cracking function
     if (std::strcmp(file_name, "passwdmd5") == 0)
     {
-        return crack_passwdmd5(file);
+        return crack_passwdmd5(file, "0", 100000);
     }
     else if (std::strcmp(file_name, "passwdSHA256") == 0)
     {
-        return crack_passwdSHA256(file);
+        return crack_passwdSHA256(file, "0", 100000);
     }
     else if (std::strcmp(file_name, "passwdSHA256salt") == 0)
     {
-        return crack_passwdSHA256salt(file);
+        return crack_passwdSHA256salt(file, "0", 100000);
     }
     else
     {
