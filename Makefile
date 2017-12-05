@@ -5,15 +5,18 @@
 #
 
 CXX=c++
-CXXFLAGS=-std=c++11 -lcrypto -I$(HOME)/.local/include -L$(HOME)/.local/lib
+CXXFLAGS=-g -std=c++11 -lcrypto -I$(HOME)/.local/include -L$(HOME)/.local/lib
+
+all: login usergen
 
 login: login.cpp
 	$(CXX) $(CXXFLAGS) -o login login.cpp
 
-clean:
-	rm login
+usergen: usergen.cpp
+	$(CXX) $(CXXFLAGS) -o usergen usergen.cpp
 
-all: login
+clean:
+	rm -f login usergen
 
 .PHONY: clean
 .SECONDARY:
